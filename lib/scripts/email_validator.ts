@@ -18,6 +18,7 @@ export default function isEmailValid(email: string) {
     domainParts.some(function (part) {
       return part.length > 63;
     })
+    
   )
     return false;
 
