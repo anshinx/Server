@@ -25,13 +25,15 @@ UserRoute.post(
     next: express.NextFunction
   ) => {
     const body = req.body;
-
+    //Getting body items seperated. only getting needed params
     const username = body.username.toString().toLowerCase;
     const name = body.name;
     const surname = body.surname;
     const email = body.email;
     const password = body.password;
-    //Hash password
+
+    //Hashing password
+
     const hashedPassword = crypto
       .createHmac("sha256", key)
       .update(password)
@@ -66,12 +68,13 @@ UserRoute.post(
       .collection("users")
       .insertOne({ username, name, surname, password: hashedPassword, email })
       .catch((err) => {
+        //Checking what is present
         if (Object.keys(err.keyValue)[0] === "email")
           return res.status(406).json({ error: "ERR_EMAIL_ALREADY_EXIST" });
 
         if (Object.keys(err.keyValue)[0] === "username")
           return res.status(406).json({ error: "ERR_USERNAME_ALREADY_EXIST" });
-
+        //other internal server error
         return res.status(500).json({ error: err });
       })
       .then(() => {
@@ -79,10 +82,8 @@ UserRoute.post(
         const token = jwt.sign({ email, password, username }, key, {
           expiresIn: "1d",
         });
-        //Send token
-        res.header("auth-token", token).json(token);
-
-        /*         return res.status(201).json({ success: "success" }); */
+        //Send token to header
+        res.header("auth-token", token);
       });
   }
 );
@@ -91,15 +92,14 @@ UserRoute.post(
   "/login",
   async (req: express.Request, res: express.Response) => {
     const body = req.body;
-
+    //Seperating body items . Only getting required items
     const username = body.username;
     const password = body.password;
     const email = body.email;
 
-    //Hash password
+    //Hashing password for comparing
     const hashedPassword = crypto
       .createHmac("sha256", key)
-
       .update(password)
       .digest("hex");
 
@@ -116,18 +116,20 @@ UserRoute.post(
         .then((user) => {
           if (!user)
             return res.status(404).json({ error: "ERR_USER_NOT_FOUND" });
-
+          //Checking if password is true
           if (user.password !== hashedPassword)
             return res.status(401).json({ error: "ERR_WRONG_PASSWORD" });
-
+          // ! Not Setting password hash for security
           user.password = undefined;
+          //signing token with user creds
           const token = jwt.sign({ user }, key, {
             expiresIn: "1d",
           });
+          //signing refreshToken for further use cases
           const refreshToken = jwt.sign({ _id: user._id }, key, {
             expiresIn: "7d",
           });
-
+          //Inserting tokens to cookies
           res.cookie("authToken", token, {
             httpOnly: true,
             maxAge: 1000 * 60 * 60 * 24 * 7,
@@ -136,37 +138,43 @@ UserRoute.post(
             httpOnly: true,
             maxAge: 1000 * 60 * 60 * 24 * 7,
           });
+
+          //end of response
           res.header("auth-token", token).json({ success: "success" });
         });
     } else {
+      //Check if username is exists
       db.db
         .collection("users")
         .findOne({ username })
         .then((user) => {
           if (!user)
             return res.status(404).json({ error: "ERR_USER_NOT_FOUND" });
-
+          //Checking password
           if (user.password !== hashedPassword)
             return res.status(401).json({ error: "ERR_WRONG_PASSWORD" });
+          //!Not sending password for security reasons
           user.password = undefined;
+          //Signing token and refreshToken
           const token = jwt.sign(user, key, {
             expiresIn: "1d",
           });
           const refreshToken = jwt.sign(user.username, key, {
             expiresIn: "7d",
           });
-
+          //Inserting tokens to cookies
           res.cookie("refreshToken", refreshToken, {
             httpOnly: true,
             maxAge: 1000 * 60 * 60 * 24 * 7,
           });
           res.header("auth-token", token);
+          //End of response 
           res.header("ref-token", refreshToken).json({ success: "success" });
         });
     }
   }
 );
-
+//Exchange expired auth-token with refreshToken
 UserRoute.post(
   "/refresh",
   async (req: express.Request, res: express.Response) => {
@@ -181,7 +189,7 @@ UserRoute.post(
     });
   }
 );
-
+//Temporary tests
 UserRoute.get(
   "/test",
   authenticateToken,
@@ -190,7 +198,7 @@ UserRoute.get(
     res.status(200).json(req.body.user);
   }
 );
-
+//AuthenticateToken middleware
 function authenticateToken(
   req: express.Request,
   res: express.Response,
