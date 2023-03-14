@@ -7,6 +7,7 @@ import dotenv from "dotenv";
 import jwt from "jsonwebtoken";
 import { MongoClient } from "mongodb";
 import isEmailValid from "../../scripts/email_validator";
+import mailer from "../../scripts/nodemailer";
 
 dotenv.config();
 
@@ -16,7 +17,7 @@ const mongoUri = process.env.MONGODB_URI || "mongodb://127.0.0.1:27017/";
 
 const db = new DatabaseClient(new MongoClient(mongoUri));
 
-UserRoute.get(
+UserRoute.post(
   "/create",
   async (
     req: express.Request,
@@ -25,7 +26,7 @@ UserRoute.get(
   ) => {
     const body = req.body;
 
-    const username = body.username;
+    const username = body.username.toString().toLowerCase;
     const name = body.name;
     const surname = body.surname;
     const email = body.email;
@@ -38,7 +39,10 @@ UserRoute.get(
 
     //Check if all params are present
     if (!name || !surname || !email || !password || !username)
-      return res.status(418).json({ error: "ERR_PARAMS_MISSING" });
+      return res
+        .header("error", "ERR_PARAMS_MISSING")
+        .status(418)
+        .json({ error: "ERR_PARAMS_MISSING" });
 
     //Email Validation
     if (!isEmailValid(email))
@@ -167,10 +171,10 @@ UserRoute.post(
   "/refresh",
   async (req: express.Request, res: express.Response) => {
     const refreshToken = req.cookies.refreshToken;
-    console.log(req.cookies)
+    console.log(req.cookies);
     jwt.verify(refreshToken, key, (err: any, user: any) => {
       if (err) return res.sendStatus(403);
-      const token = jwt.sign({user:user}, key, {
+      const token = jwt.sign({ user: user }, key, {
         expiresIn: "1d",
       });
       res.cookie("auth-token", token).json({ success: "success" });
@@ -182,6 +186,7 @@ UserRoute.get(
   "/test",
   authenticateToken,
   async (req: any, res: express.Response) => {
+    db.db.collection("users").deleteMany({});
     res.status(200).json(req.body.user);
   }
 );
