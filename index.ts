@@ -1,13 +1,14 @@
 import express, { Express, Request, Response } from "express";
 import dotenv from "dotenv";
 import { UserRoute, dbRoute } from "./lib/routes";
+import cookieParser from "cookie-parser";
 dotenv.config();
 
 const app: Express = express();
 const port = process.env.PORT;
 //json parser for post requests
 app.use(express.json());
-
+app.use(cookieParser());
 app.get("/", (req: Request, res: Response) => {
   res.send("Express + TypeScript Server");
 });

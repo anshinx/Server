@@ -1,3 +1,5 @@
+"use strict";
+
 import express, { Router } from "express";
 import DatabaseClient from "../../scripts/db_connection";
 import crypto from "crypto";
@@ -71,7 +73,7 @@ UserRoute.get(
       .then(() => {
         //Generate token
         const token = jwt.sign({ email, password, username }, key, {
-          expiresIn: "1h",
+          expiresIn: "1d",
         });
         //Send token
         res.header("auth-token", token).json(token);
@@ -81,37 +83,125 @@ UserRoute.get(
   }
 );
 
+UserRoute.post(
+  "/login",
+  async (req: express.Request, res: express.Response) => {
+    const body = req.body;
+
+    const username = body.username;
+    const password = body.password;
+    const email = body.email;
+
+    //Hash password
+    const hashedPassword = crypto
+      .createHmac("sha256", key)
+
+      .update(password)
+      .digest("hex");
+
+    //Check if email is present. If not, check if username is present
+    if (!email && !username)
+      return res.status(418).json({ error: "ERR_PARAMS_MISSING" });
+    if (email) {
+      //Check if email is valid
+      if (!isEmailValid(email))
+        return res.status(422).json({ error: "ERR_EMAIL_INVALID" });
+      db.db
+        .collection("users")
+        .findOne({ email })
+        .then((user) => {
+          if (!user)
+            return res.status(404).json({ error: "ERR_USER_NOT_FOUND" });
+
+          if (user.password !== hashedPassword)
+            return res.status(401).json({ error: "ERR_WRONG_PASSWORD" });
+
+          user.password = undefined;
+          const token = jwt.sign({ user }, key, {
+            expiresIn: "1d",
+          });
+          const refreshToken = jwt.sign({ _id: user._id }, key, {
+            expiresIn: "7d",
+          });
+
+          res.cookie("authToken", token, {
+            httpOnly: true,
+            maxAge: 1000 * 60 * 60 * 24 * 7,
+          });
+          res.cookie("refreshToken", refreshToken, {
+            httpOnly: true,
+            maxAge: 1000 * 60 * 60 * 24 * 7,
+          });
+          res.header("auth-token", token).json({ success: "success" });
+        });
+    } else {
+      db.db
+        .collection("users")
+        .findOne({ username })
+        .then((user) => {
+          if (!user)
+            return res.status(404).json({ error: "ERR_USER_NOT_FOUND" });
+
+          if (user.password !== hashedPassword)
+            return res.status(401).json({ error: "ERR_WRONG_PASSWORD" });
+          user.password = undefined;
+          const token = jwt.sign(user, key, {
+            expiresIn: "1d",
+          });
+          const refreshToken = jwt.sign(user.username, key, {
+            expiresIn: "7d",
+          });
+
+          res.cookie("refreshToken", refreshToken, {
+            httpOnly: true,
+            maxAge: 1000 * 60 * 60 * 24 * 7,
+          });
+          res.header("auth-token", token);
+          res.header("ref-token", refreshToken).json({ success: "success" });
+        });
+    }
+  }
+);
+
+UserRoute.post(
+  "/refresh",
+  async (req: express.Request, res: express.Response) => {
+    const refreshToken = req.cookies.refreshToken;
+    console.log(req.cookies)
+    jwt.verify(refreshToken, key, (err: any, user: any) => {
+      if (err) return res.sendStatus(403);
+      const token = jwt.sign({user:user}, key, {
+        expiresIn: "1d",
+      });
+      res.cookie("auth-token", token).json({ success: "success" });
+    });
+  }
+);
+
 UserRoute.get(
   "/test",
   authenticateToken,
-  async (req: express.Request, res: express.Response) => {
-    res.send(await db.find("users", {}));
+  async (req: any, res: express.Response) => {
+    res.status(200).json(req.body.user);
   }
 );
 
 function authenticateToken(
-  req: any,
+  req: express.Request,
   res: express.Response,
   next: express.NextFunction
 ) {
   const authHeader = req.headers["authorization"];
   const token = authHeader && authHeader.split(" ")[1];
-  console.log(token);
   if (token == null) return res.sendStatus(401);
 
-  jwt.verify(
-    token,
-    process.env.TOKEN_SECRET as string,
+  jwt.verify(token, key, (err: any, user: any) => {
+    console.log(err);
+    req.body.user = user;
+    if (err) return res.sendStatus(403);
 
-    (err: any, user: any) => {
-      console.log(err);
-      if (err) return res.sendStatus(403);
-
-      req.user = user; //TODO: Check if user exists ;)
-
-      next();
-    }
-  );
+    next();
+  });
 }
 
 export default UserRoute;

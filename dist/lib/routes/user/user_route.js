@@ -69,27 +69,106 @@ UserRoute.get("/create", (req, res, next) => __awaiter(void 0, void 0, void 0, f
         .then(() => {
         //Generate token
         const token = jsonwebtoken_1.default.sign({ email, password, username }, key, {
-            expiresIn: "1h",
+            expiresIn: "1d",
         });
         //Send token
         res.header("auth-token", token).json(token);
         /*         return res.status(201).json({ success: "success" }); */
     });
 }));
+UserRoute.post("/login", (req, res) => __awaiter(void 0, void 0, void 0, function* () {
+    const body = req.body;
+    const username = body.username;
+    const password = body.password;
+    const email = body.email;
+    //Hash password
+    const hashedPassword = crypto_1.default
+        .createHmac("sha256", key)
+        .update(password)
+        .digest("hex");
+    //Check if email is present. If not, check if username is present
+    if (!email && !username)
+        return res.status(418).json({ error: "ERR_PARAMS_MISSING" });
+    if (email) {
+        //Check if email is valid
+        if (!(0, email_validator_1.default)(email))
+            return res.status(422).json({ error: "ERR_EMAIL_INVALID" });
+        db.db
+            .collection("users")
+            .findOne({ email })
+            .then((user) => {
+            if (!user)
+                return res.status(404).json({ error: "ERR_USER_NOT_FOUND" });
+            if (user.password !== hashedPassword)
+                return res.status(401).json({ error: "ERR_WRONG_PASSWORD" });
+            user.password = undefined;
+            const token = jsonwebtoken_1.default.sign({ user }, key, {
+                expiresIn: "1d",
+            });
+            const refreshToken = jsonwebtoken_1.default.sign({ _id: user._id }, key, {
+                expiresIn: "7d",
+            });
+            res.cookie("authToken", token, {
+                httpOnly: true,
+                maxAge: 1000 * 60 * 60 * 24 * 7,
+            });
+            res.cookie("refreshToken", refreshToken, {
+                httpOnly: true,
+                maxAge: 1000 * 60 * 60 * 24 * 7,
+            });
+            res.header("auth-token", token).json({ success: "success" });
+        });
+    }
+    else {
+        db.db
+            .collection("users")
+            .findOne({ username })
+            .then((user) => {
+            if (!user)
+                return res.status(404).json({ error: "ERR_USER_NOT_FOUND" });
+            if (user.password !== hashedPassword)
+                return res.status(401).json({ error: "ERR_WRONG_PASSWORD" });
+            user.password = undefined;
+            const token = jsonwebtoken_1.default.sign(user, key, {
+                expiresIn: "1d",
+            });
+            const refreshToken = jsonwebtoken_1.default.sign(user.username, key, {
+                expiresIn: "7d",
+            });
+            res.cookie("refreshToken", refreshToken, {
+                httpOnly: true,
+                maxAge: 1000 * 60 * 60 * 24 * 7,
+            });
+            res.header("auth-token", token);
+            res.header("ref-token", refreshToken).json({ success: "success" });
+        });
+    }
+}));
+UserRoute.post("/refresh", (req, res) => __awaiter(void 0, void 0, void 0, function* () {
+    const refreshToken = req.cookies.refreshToken;
+    console.log(req.cookies);
+    jsonwebtoken_1.default.verify(refreshToken, key, (err, user) => {
+        if (err)
+            return res.sendStatus(403);
+        const token = jsonwebtoken_1.default.sign({ user: user }, key, {
+            expiresIn: "1d",
+        });
+        res.cookie("auth-token", token).json({ success: "success" });
+    });
+}));
 UserRoute.get("/test", authenticateToken, (req, res) => __awaiter(void 0, void 0, void 0, function* () {
-    res.send(yield db.find("users", {}));
+    res.status(200).json(req.body.user);
 }));
 function authenticateToken(req, res, next) {
     const authHeader = req.headers["authorization"];
     const token = authHeader && authHeader.split(" ")[1];
-    console.log(token);
     if (token == null)
         return res.sendStatus(401);
-    jsonwebtoken_1.default.verify(token, process.env.TOKEN_SECRET, (err, user) => {
+    jsonwebtoken_1.default.verify(token, key, (err, user) => {
         console.log(err);
+        req.body.user = user;
         if (err)
             return res.sendStatus(403);
-        req.user = user; //TODO: Check if user exists ;)
         next();
     });
 }

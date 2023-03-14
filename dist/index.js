@@ -6,11 +6,13 @@ Object.defineProperty(exports, "__esModule", { value: true });
 const express_1 = __importDefault(require("express"));
 const dotenv_1 = __importDefault(require("dotenv"));
 const routes_1 = require("./lib/routes");
+const cookie_parser_1 = __importDefault(require("cookie-parser"));
 dotenv_1.default.config();
 const app = (0, express_1.default)();
 const port = process.env.PORT;
 //json parser for post requests
 app.use(express_1.default.json());
+app.use((0, cookie_parser_1.default)());
 app.get("/", (req, res) => {
     res.send("Express + TypeScript Server");
 });
