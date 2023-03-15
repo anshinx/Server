@@ -1,13 +1,11 @@
 import { MongoClient } from "mongodb";
 
-const mongodburi = "mongodb://127.0.0.1:27017/"; // This is the default URI for MongoDB
-
 export default class DatabaseClient {
   constructor(private client: MongoClient) {
     this.client = client;
   }
 
-  public async connect() {
+  private async connectDB() {
     try {
       this.client.connect();
       console.log("[MongoDB] Connected to MongoDB");
@@ -15,8 +13,9 @@ export default class DatabaseClient {
       console.log("[Error] Error connecting to MongoDB : " + error);
     }
   }
+  private database = this.client.db("hatirlatsana");
 
-  public async disconnect() {
+  private async disconnectDB() {
     try {
       await this.client.close();
       console.log("[MongoDB] Disconnected from MongoDB");
@@ -25,38 +24,17 @@ export default class DatabaseClient {
     }
   }
 
-  public async connectDB() {
-    await this.connect();
+  /*
+   *GETTERS
+   */
+
+  public async connect(): Promise<void> {
+    await this.connectDB();
   }
 
-  public async disconnectDB() {
-    await this.disconnect();
+  public async disconnect() {
+    await this.disconnectDB();
   }
 
-  public db = this.client.db("hatirlatsana");
-
-  public async insertOne(
-    collection: string,
-    document: {},
-    errorcallback: Function
-  ) {
-    const db = this.client.db("hatirlatsana");
-    db.collection(collection).createIndex({ email: 1 }, { unique: true });
-    db.collection(collection)
-      .insertOne(document)
-      .catch((err) => {
-        errorcallback(err);
-      });
-  }
-
-  public insertMany(collection: string, documents: any[]) {
-    const db = this.client.db("hatirlatsana");
-    db.collection(collection).insertMany(documents);
-  }
-
-  public async find(collection: string, query: any) {
-    const db = this.client.db("hatirlatsana");
-
-    return await db.collection(collection).find(query).toArray();
-  }
+  public db = this.database;
 }

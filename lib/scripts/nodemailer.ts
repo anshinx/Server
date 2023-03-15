@@ -1,24 +1,28 @@
 import nodemailer from "nodemailer";
 import hbs, {
-  NodemailerExpressHandlebarsOptions,
+  NodemailerExpressHandlebarsOptions, //Handlebar types for typescript
 } from "nodemailer-express-handlebars";
 import path from "path";
+import dotenv from "dotenv";
+
+dotenv.config();
 
 export default function mailer(
   name: string,
   link: string,
   receiver: string,
-  subject: string,
+  subject: string
 ) {
+  //TRANSPORT
   let transport = nodemailer.createTransport({
     host: "smtp.gmail.com",
     port: 465,
     auth: {
       user: "yenersg.58@gmail.com",
-      pass: "uipttxtgssuadxxv",
+      pass: process.env.EMAIL_USER_PASSWORD,
     },
   });
-
+  //handlebars opt.
   const handlebarOptions: NodemailerExpressHandlebarsOptions = {
     viewEngine: {
       partialsDir: path.resolve("./lib/handlebars/"),
@@ -26,20 +30,20 @@ export default function mailer(
     },
     viewPath: path.resolve("./lib/handlebars/"),
   };
-
+  //Middleware for handlebar
   transport.use("compile", hbs(handlebarOptions));
-
+  //Mail Opts.
   const mailOptions = {
-    from: "yenersg.58@gmail.com", // Sender address
+    from: "yenersg.58@gmail.com",
     to: receiver, // List of recipients
     subject: subject, // Subject line
     template: "email", // the name of the template file i.e email.handlebars
     context: {
-      name: name, // replace {{name}} with Adebola
-      link: link // replace {{company}} with My Company
+      name: name,
+      link: link,
     },
   };
-
+  //Send Mail
   transport.sendMail(mailOptions, function (err, info) {
     if (err) {
       console.log(err);

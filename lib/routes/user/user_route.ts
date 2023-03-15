@@ -26,7 +26,7 @@ UserRoute.post(
   ) => {
     const body = req.body;
     //Getting body items seperated. only getting needed params
-    const username = body.username.toString().toLowerCase;
+    const username: string = body.username;
     const name = body.name;
     const surname = body.surname;
     const email = body.email;
@@ -64,9 +64,17 @@ UserRoute.post(
         return res.status(500).json({ error: err });
       });
     //Insert user
+
     await db.db
       .collection("users")
-      .insertOne({ username, name, surname, password: hashedPassword, email })
+      .insertOne({
+        username: username.toLowerCase().trim(),
+        name: name.trim(),
+        surname: surname.trim(),
+        password: hashedPassword,
+        email: email.trim(),
+        verified: false,
+      })
       .catch((err) => {
         //Checking what is present
         if (Object.keys(err.keyValue)[0] === "email")
@@ -83,7 +91,7 @@ UserRoute.post(
           expiresIn: "1d",
         });
         //Send token to header
-        res.header("auth-token", token);
+        res.header("auth-token", token).sendStatus(200);
       });
   }
 );
@@ -168,7 +176,7 @@ UserRoute.post(
             maxAge: 1000 * 60 * 60 * 24 * 7,
           });
           res.header("auth-token", token);
-          //End of response 
+          //End of response
           res.header("ref-token", refreshToken).json({ success: "success" });
         });
     }
@@ -189,6 +197,25 @@ UserRoute.post(
     });
   }
 );
+
+//Mail verification
+UserRoute.post(
+  "/verifyViaEmail/:id/:token",
+  (req: express.Request, res: express.Response) => {
+    const params = req.params;
+
+    //Seperating params
+    const id = params.id;
+    const verificationToken = params.token;
+    let _id;
+    jwt.verify(verificationToken, key, (err: any, user: any) => {
+      console.log(err);
+      _id = "dumm";
+      if (err) return res.sendStatus(403);
+    });
+  }
+);
+
 //Temporary tests
 UserRoute.get(
   "/test",
@@ -198,6 +225,7 @@ UserRoute.get(
     res.status(200).json(req.body.user);
   }
 );
+
 //AuthenticateToken middleware
 function authenticateToken(
   req: express.Request,
