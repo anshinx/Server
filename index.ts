@@ -2,13 +2,31 @@ import express, { Express, Request, Response } from "express";
 import dotenv from "dotenv";
 import { UserRoute, dbRoute } from "./lib/routes";
 import cookieParser from "cookie-parser";
+import cors from "cors";
 dotenv.config();
+
+const options: cors.CorsOptions = {
+  allowedHeaders: [
+    "Origin",
+    "X-Requested-With",
+    "Content-Type",
+    "Accept",
+    "X-Access-Token",
+    "Authorization",
+  ],
+  credentials: true,
+  methods: "GET,HEAD,OPTIONS,PUT,PATCH,POST,DELETE",
+  origin: "http://localhost:1881",
+  preflightContinue: false,
+};
 
 const app: Express = express();
 const port = process.env.PORT;
 //json parser for post requests
 app.use(express.json());
 app.use(cookieParser());
+app.use(cors(options));
+
 app.get("/", (req: Request, res: Response) => {
   res.send("Express + TypeScript Server");
 });

@@ -19,7 +19,7 @@ export default function mailer(
     port: 465,
     auth: {
       user: "yenersg.58@gmail.com",
-      pass: process.env.EMAIL_USER_PASSWORD,
+      pass: "egcyhdikvcfyashy",
     },
   });
   //handlebars opt.

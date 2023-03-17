@@ -5,7 +5,7 @@ import DatabaseClient from "../../scripts/db_connection";
 import crypto from "crypto";
 import dotenv from "dotenv";
 import jwt from "jsonwebtoken";
-import { MongoClient } from "mongodb";
+import { MongoClient, ObjectId } from "mongodb";
 import isEmailValid from "../../scripts/email_validator";
 import mailer from "../../scripts/nodemailer";
 
@@ -42,7 +42,7 @@ UserRoute.post(
     //Check if all params are present
     if (!name || !surname || !email || !password || !username)
       return res
-        .header("error", "ERR_PARAMS_MISSING")
+        .setHeader("error", "ERR_PARAMS_MISSING")
         .status(418)
         .json({ error: "ERR_PARAMS_MISSING" });
 
@@ -73,7 +73,8 @@ UserRoute.post(
         surname: surname.trim(),
         password: hashedPassword,
         email: email.trim(),
-        verified: false,
+        created_at: new Date().valueOf(),
+        email_verified: false,
       })
       .catch((err) => {
         //Checking what is present
@@ -87,11 +88,31 @@ UserRoute.post(
       })
       .then(() => {
         //Generate token
-        const token = jwt.sign({ email, password, username }, key, {
-          expiresIn: "1d",
+        const token = jwt.sign(
+          { email, username: username.toLowerCase().trim(), name, surname },
+          key,
+          {
+            expiresIn: "1d",
+          }
+        );
+        const refreshToken = jwt.sign(
+          { username: username.toLowerCase().trim() },
+          key,
+          {
+            expiresIn: "7d",
+          }
+        );
+
+        res.cookie("auth-token", token, {
+          httpOnly: true,
+          maxAge: 1000 * 60 * 60 * 1,
         });
-        //Send token to header
-        res.header("auth-token", token).sendStatus(200);
+        res.cookie("refreshToken", refreshToken, {
+          httpOnly: true,
+          maxAge: 1000 * 60 * 60 * 7,
+        });
+        //Send token to setHeader
+        res.setHeader("auth-token", token).sendStatus(200);
       });
   }
 );
@@ -134,11 +155,11 @@ UserRoute.post(
             expiresIn: "1d",
           });
           //signing refreshToken for further use cases
-          const refreshToken = jwt.sign({ _id: user._id }, key, {
+          const refreshToken = jwt.sign({ username: user.username }, key, {
             expiresIn: "7d",
           });
           //Inserting tokens to cookies
-          res.cookie("authToken", token, {
+          res.cookie("auth-token", token, {
             httpOnly: true,
             maxAge: 1000 * 60 * 60 * 24 * 7,
           });
@@ -148,13 +169,16 @@ UserRoute.post(
           });
 
           //end of response
-          res.header("auth-token", token).json({ success: "success" });
+          res.setHeader("auth-token", token);
+
+          //End of response
+          res.setHeader("ref-token", refreshToken).json({ success: "yes" });
         });
     } else {
       //Check if username is exists
       db.db
         .collection("users")
-        .findOne({ username })
+        .findOne({ username: username.toLowerCase().trim() })
         .then((user) => {
           if (!user)
             return res.status(404).json({ error: "ERR_USER_NOT_FOUND" });
@@ -167,7 +191,7 @@ UserRoute.post(
           const token = jwt.sign(user, key, {
             expiresIn: "1d",
           });
-          const refreshToken = jwt.sign(user.username, key, {
+          const refreshToken = jwt.sign({ username: user.username }, key, {
             expiresIn: "7d",
           });
           //Inserting tokens to cookies
@@ -175,9 +199,14 @@ UserRoute.post(
             httpOnly: true,
             maxAge: 1000 * 60 * 60 * 24 * 7,
           });
-          res.header("auth-token", token);
+          res.cookie("auth-token", token, {
+            httpOnly: true,
+            maxAge: 1000 * 60 * 60 * 24 * 7,
+          });
+          res.setHeader("auth-token", token);
+
           //End of response
-          res.header("ref-token", refreshToken).json({ success: "success" });
+          res.setHeader("ref-token", refreshToken).json({ success: "yes" });
         });
     }
   }
@@ -187,34 +216,92 @@ UserRoute.post(
   "/refresh",
   async (req: express.Request, res: express.Response) => {
     const refreshToken = req.cookies.refreshToken;
-    console.log(req.cookies);
-    jwt.verify(refreshToken, key, (err: any, user: any) => {
+    console.log("refresh");
+    jwt.verify(refreshToken, key, (err: any, id: any) => {
       if (err) return res.sendStatus(403);
-      const token = jwt.sign({ user: user }, key, {
-        expiresIn: "1d",
-      });
-      res.cookie("auth-token", token).json({ success: "success" });
+      console.log("verified");
+      db.db
+        .collection("users")
+        .findOne({ username: id.username })
+        .then((user) => {
+          console.log(user);
+          if (user != null) {
+            user.password = undefined;
+            const token = jwt.sign({ user }, key, {
+              expiresIn: "1d",
+            });
+            const renewedRefreshToken = jwt.sign(
+              { username: user.username },
+              key,
+              {
+                expiresIn: "7d",
+              }
+            );
+            res
+              .cookie("auth-token", token)
+              .cookie("refreshToken", renewedRefreshToken)
+              .status(200)
+              .send({
+                refreshed: "refreshed",
+              });
+          } else {
+            return res.status(400).send("not found");
+          }
+        })
+        .catch((err) => {
+          console.error(err);
+        });
     });
   }
 );
 
 //Mail verification
-UserRoute.post(
-  "/verifyViaEmail/:id/:token",
+UserRoute.get(
+  "/verifyViaEmail/",
   (req: express.Request, res: express.Response) => {
-    const params = req.params;
+    const query = req.query;
 
-    //Seperating params
-    const id = params.id;
-    const verificationToken = params.token;
+    //Seperating query
+
+    const verificationToken: any = query.token;
     let _id;
     jwt.verify(verificationToken, key, (err: any, user: any) => {
       console.log(err);
-      _id = "dumm";
+      console.log(user);
+
       if (err) return res.sendStatus(403);
+      const coll = db.db
+        .collection("users")
+        .findOneAndUpdate(
+          { username: user.username },
+          { $set: { email_verified: true } }
+        )
+        .then((user) => {
+          console.log(user);
+        });
     });
+    return res.status(200).send("EMAIL VERIFIED");
   }
 );
+
+UserRoute.get("/sendVerifier", (req, res) => {
+  const authToken = req.cookies["auth-token"];
+  jwt.verify(authToken, key, (err: any, user: any) => {
+    console.log(user);
+    const verificationKey = jwt.sign(
+      { userID: user._id, username: user.username },
+      key
+    );
+    console.log(user.email);
+    mailer(
+      user.username,
+      createVerification(verificationKey),
+      user.email,
+      "Hatırlatsana'ya Hoşgeldin"
+    );
+    res.sendStatus(200).send("SENT");
+  });
+});
 
 //Temporary tests
 UserRoute.get(
@@ -232,8 +319,8 @@ function authenticateToken(
   res: express.Response,
   next: express.NextFunction
 ) {
-  const authHeader = req.headers["authorization"];
-  const token = authHeader && authHeader.split(" ")[1];
+  const authsetHeader = req.headers["authorization"];
+  const token = authsetHeader && authsetHeader.split(" ")[1];
   if (token == null) return res.sendStatus(401);
 
   jwt.verify(token, key, (err: any, user: any) => {
@@ -244,5 +331,7 @@ function authenticateToken(
     next();
   });
 }
-
+function createVerification(token: string) {
+  return `127.0.0.1:1881/user/verifyViaEmail?token=${token}`;
+}
 export default UserRoute;
