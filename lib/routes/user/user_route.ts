@@ -318,7 +318,7 @@ function authenticateToken(
   req: express.Request,
   res: express.Response,
   next: express.NextFunction
-) {
+): express.Response<any, Record<string, any>> | undefined {
   const authsetHeader = req.headers["authorization"];
   const token = authsetHeader && authsetHeader.split(" ")[1];
   if (token == null) return res.sendStatus(401);
