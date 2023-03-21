@@ -314,7 +314,7 @@ UserRoute.get(
 );
 
 //AuthenticateToken middleware
-function authenticateToken(
+export function authenticateToken(
   req: express.Request,
   res: express.Response,
   next: express.NextFunction
