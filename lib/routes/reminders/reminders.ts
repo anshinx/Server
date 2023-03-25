@@ -9,7 +9,7 @@ const mongoUri = process.env.MONGODB_URI || "mongodb://127.0.0.1:27017/";
 
 const db = new DatabaseClient(new MongoClient(mongoUri));
 
-ReminderRoute.get("/remindMe", authenticateToken, (req, res) => {
+ReminderRoute.get("/setReminder", authenticateToken, (req, res) => {
   const body = req.body;
   const REMINDER_NAME = body.REMINDER_NAME;
   const REMINDER_VALUE = body.REMINDER_VALUE;
@@ -28,5 +28,6 @@ ReminderRoute.get("/remindMe", authenticateToken, (req, res) => {
     res.json(val)
   })
 });
+ 
 
 export default ReminderRoute;

@@ -8,14 +8,20 @@ import jwt from "jsonwebtoken";
 import { MongoClient, ObjectId } from "mongodb";
 import isEmailValid from "../../scripts/email_validator";
 import mailer from "../../scripts/nodemailer";
+import path from "path";
 
 dotenv.config();
+const domain = "127.0.0.1:1881"
 
 const UserRoute = Router();
 const key = process.env.SECRET_KEY || "";
 const mongoUri = process.env.MONGODB_URI || "mongodb://127.0.0.1:27017/";
 
 const db = new DatabaseClient(new MongoClient(mongoUri));
+
+UserRoute.get("/", (req, res) => {
+  res.sendFile(path.join(__dirname, "../../templates/hello.html"));
+});
 
 UserRoute.post(
   "/create",
@@ -257,7 +263,7 @@ UserRoute.post(
 
 //Mail verification
 UserRoute.get(
-  "/verifyViaEmail/",
+  "/verifyViaEmail",
   (req: express.Request, res: express.Response) => {
     const query = req.query;
 
@@ -267,7 +273,6 @@ UserRoute.get(
     let _id;
     jwt.verify(verificationToken, key, (err: any, user: any) => {
       console.log(err);
-      console.log(user);
 
       if (err) return res.sendStatus(403);
       const coll = db.db
@@ -277,29 +282,27 @@ UserRoute.get(
           { $set: { email_verified: true } }
         )
         .then((user) => {
-          console.log(user);
+          if (!user.value) return;
+          return res.status(200).send(user.value.username);
         });
     });
-    return res.status(200).send("EMAIL VERIFIED");
   }
 );
 
 UserRoute.get("/sendVerifier", (req, res) => {
   const authToken = req.cookies["auth-token"];
   jwt.verify(authToken, key, (err: any, user: any) => {
-    console.log(user);
     const verificationKey = jwt.sign(
       { userID: user._id, username: user.username },
       key
     );
-    console.log(user.email);
     mailer(
       user.username,
       createVerification(verificationKey),
       user.email,
       "Hatırlatsana'ya Hoşgeldin"
     );
-    res.sendStatus(200).send("SENT");
+    res.status(200).send("SENT");
   });
 });
 
@@ -332,6 +335,6 @@ export function authenticateToken(
   });
 }
 function createVerification(token: string) {
-  return `127.0.0.1:1881/user/verifyViaEmail?token=${token}`;
+  return `${domain}/user/verifyViaEmail?token=${token}`;
 }
 export default UserRoute;

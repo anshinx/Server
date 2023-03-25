@@ -18,8 +18,8 @@ export default function mailer(
     host: "smtp.gmail.com",
     port: 465,
     auth: {
-      user: "yenersg.58@gmail.com",
-      pass: "egcyhdikvcfyashy",
+      user: "hatirlatsana@gmail.com",
+      pass: process.env.EMAIL_USER_PASSWORD,
     },
   });
   //handlebars opt.
@@ -34,7 +34,7 @@ export default function mailer(
   transport.use("compile", hbs(handlebarOptions));
   //Mail Opts.
   const mailOptions = {
-    from: "yenersg.58@gmail.com",
+    from: "hatirlatsana@gmail.com",
     to: receiver, // List of recipients
     subject: subject, // Subject line
     template: "email", // the name of the template file i.e email.handlebars

@@ -3,6 +3,8 @@ import dotenv from "dotenv";
 import { UserRoute, dbRoute, ReminderRoute } from "./lib/routes";
 import cookieParser from "cookie-parser";
 import cors from "cors";
+import https from "https";
+import fs from 'fs'
 dotenv.config();
 
 const options: cors.CorsOptions = {
@@ -16,7 +18,7 @@ const options: cors.CorsOptions = {
   ],
   credentials: true,
   methods: "GET,HEAD,OPTIONS,PUT,PATCH,POST,DELETE",
-  origin: "http://localhost:1881",
+  origin: "http://127.0.0.1:1881",
   preflightContinue: false,
 };
 
@@ -37,9 +39,22 @@ app.use("/reminder", ReminderRoute);
 process.on("uncaughtException", function (error) {
   console.log(error.stack);
 });
-
-app.listen(port, () => {
-  console.log(
-    `⚡️[Hatırlatsana]: Server is running at http://localhost:${port}`
-  );
-});
+https
+  .createServer(
+    {
+      key: fs.readFileSync("key.pem"),
+      cert: fs.readFileSync("cert.pem"),
+    },
+    app
+  )
+  .listen(port, () => {
+    console.log(
+      `⚡️[Hatırlatsana]: Server is running at https://127.0.0.1:${port}`
+    );
+    console.log(
+      `⚡️[Hatırlatsana]: Users are running at https://127.0.0.1:${port}/user`
+    );
+    console.log(
+      `⚡️[Hatırlatsana]: Reminders are running at https://127.0.0.1:${port}/reminder`
+    );
+  });
