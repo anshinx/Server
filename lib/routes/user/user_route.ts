@@ -9,7 +9,7 @@ import { MongoClient, ObjectId } from "mongodb";
 import isEmailValid from "../../scripts/email_validator";
 import mailer from "../../scripts/nodemailer";
 import path from "path";
-
+//Config
 dotenv.config();
 const domain = "127.0.0.1:1881"
 
