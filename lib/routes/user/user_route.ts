@@ -11,16 +11,20 @@ import mailer from "../../scripts/nodemailer";
 import path from "path";
 //Config
 dotenv.config();
-const domain = "127.0.0.1:1881"
+const domain = "127.0.0.1:1881";
 
 const UserRoute = Router();
-const key = process.env.SECRET_KEY || "";
+const key = process.env.SECRET_KEY || "totallysecretkey";
 const mongoUri = process.env.MONGODB_URI || "mongodb://127.0.0.1:27017/";
 
 const db = new DatabaseClient(new MongoClient(mongoUri));
 
 UserRoute.get("/", (req, res) => {
   res.sendFile(path.join(__dirname, "../../templates/hello.html"));
+});
+
+UserRoute.get("/tr", (req, res) => {
+  res.status(201).json({ code: "101" });
 });
 
 UserRoute.post(
@@ -180,7 +184,7 @@ UserRoute.post(
           //End of response
           res.setHeader("ref-token", refreshToken).json({ success: "yes" });
         });
-    } else {
+    } else if (username) {
       //Check if username is exists
       db.db
         .collection("users")
@@ -191,7 +195,7 @@ UserRoute.post(
           //Checking password
           if (user.password !== hashedPassword)
             return res.status(401).json({ error: "ERR_WRONG_PASSWORD" });
-          //!Not sending password for security reasons
+          //!Not sending password for obvious security reasons
           user.password = undefined;
           //Signing token and refreshToken
           const token = jwt.sign(user, key, {
@@ -217,8 +221,10 @@ UserRoute.post(
     }
   }
 );
-//Changes Made Here
-//HEY
+
+UserRoute.get("/reAuth", authenticateToken, (req, res) => {
+  res.json(req.body.user);
+});
 
 //Exchange expired auth-token with refreshToken
 UserRoute.post(
@@ -332,7 +338,7 @@ export function authenticateToken(
   jwt.verify(token, key, (err: any, user: any) => {
     console.log(err);
     req.body.user = user;
-    if (err) return res.sendStatus(403);
+    if (err) return res.status(403).json(err);
 
     next();
   });

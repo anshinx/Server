@@ -4,7 +4,7 @@ import { UserRoute, dbRoute, ReminderRoute } from "./lib/routes";
 import cookieParser from "cookie-parser";
 import cors from "cors";
 import https from "https";
-import fs from 'fs'
+import fs from "fs";
 dotenv.config();
 
 const options: cors.CorsOptions = {
@@ -39,6 +39,20 @@ app.use("/reminder", ReminderRoute);
 process.on("uncaughtException", function (error) {
   console.log(error.stack);
 });
+
+app.listen(port, () => {
+  console.log(
+    `⚡️[Hatırlatsana]: Server is running at http://127.0.0.1:${port}`
+  );
+  console.log(
+    `⚡️[Hatırlatsana]: Users are running at http://127.0.0.1:${port}/user`
+  );
+  console.log(
+    `⚡️[Hatırlatsana]: Reminders are running at http://127.0.0.1:${port}/reminder`
+  );
+});
+
+/*
 https
   .createServer(
     {
@@ -58,3 +72,4 @@ https
       `⚡️[Hatırlatsana]: Reminders are running at https://127.0.0.1:${port}/reminder`
     );
   });
+*/
