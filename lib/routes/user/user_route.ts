@@ -239,7 +239,6 @@ UserRoute.post(
         .collection("users")
         .findOne({ username: id.username })
         .then((user) => {
-          console.log(user);
           if (user != null) {
             user.password = undefined;
             const token = jwt.sign({ user }, key, {
@@ -281,8 +280,8 @@ UserRoute.get(
     const verificationToken: any = query.token;
     let _id;
     jwt.verify(verificationToken, key, (err: any, user: any) => {
-      console.log(err);
-
+      /*  console.log(err);
+       */
       if (err) return res.sendStatus(403);
       const coll = db.db
         .collection("users")
@@ -336,7 +335,7 @@ export function authenticateToken(
   if (token == null) return res.sendStatus(401);
 
   jwt.verify(token, key, (err: any, user: any) => {
-    console.log(err);
+    /*   console.log(err);/*  */
     req.body.user = user;
     if (err) return res.status(403).json(err);
 
