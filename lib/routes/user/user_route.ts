@@ -230,7 +230,7 @@ UserRoute.get("/reAuth", authenticateToken, (req, res) => {
 UserRoute.post(
   "/refresh",
   async (req: express.Request, res: express.Response) => {
-    const refreshToken = req.cookies.refreshToken;
+    const refreshToken = req.body.refreshToken;
     console.log("refresh");
     jwt.verify(refreshToken, key, (err: any, id: any) => {
       if (err) return res.sendStatus(403);
