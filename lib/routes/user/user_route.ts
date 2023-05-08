@@ -337,7 +337,7 @@ export function authenticateToken(
   jwt.verify(token, key, (err: any, user: any) => {
     /*   console.log(err);/*  */
     req.body.user = user;
-    if (err) return res.status(403).json(err);
+    if (err) return res.json({ err: "EXPIRED_TOKEN" }).status(403);
 
     next();
   });
