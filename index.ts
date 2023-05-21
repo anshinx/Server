@@ -4,7 +4,6 @@ import { UserRoute, dbRoute, ReminderRoute } from "./lib/routes";
 import cookieParser from "cookie-parser";
 import cors from "cors";
 import https from "https";
-import fs from "fs";
 dotenv.config();
 
 const options: cors.CorsOptions = {
@@ -29,12 +28,15 @@ app.use(express.json());
 app.use(cookieParser());
 app.use(cors(options));
 
+app.get("/", (req: Request, res: Response) => {
+  res.send("Hello World!");
+});
 // User Router
-app.use("/user", UserRoute);
+app.use("/api/auth", UserRoute);
 // Temporary DB Router
-app.use("/db", dbRoute);
+app.use("/api/db", dbRoute);
 // Reminder Router
-app.use("/reminder", ReminderRoute);
+app.use("/api/reminder", ReminderRoute);
 
 process.on("uncaughtException", function (error) {
   console.log(error.stack);

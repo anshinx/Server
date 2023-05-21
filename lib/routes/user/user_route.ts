@@ -131,6 +131,7 @@ UserRoute.post(
   "/login",
   async (req: express.Request, res: express.Response) => {
     const body = req.body;
+    console.log("SOMETHING SOMETHING DARK SIDE");
     //Seperating body items . Only getting required items
     const username = body.username;
     const password = body.password;
@@ -182,7 +183,7 @@ UserRoute.post(
           res.setHeader("auth-token", token);
 
           //End of response
-          res.setHeader("ref-token", refreshToken).json({ success: "yes" });
+          res.setHeader("ref-token", refreshToken).json({ user });
         });
     } else if (username) {
       //Check if username is exists
@@ -199,7 +200,7 @@ UserRoute.post(
           user.password = undefined;
           //Signing token and refreshToken
           const token = jwt.sign(user, key, {
-            expiresIn: "1d",
+            expiresIn: "10s",
           });
           const refreshToken = jwt.sign({ username: user.username }, key, {
             expiresIn: "7d",
@@ -216,7 +217,7 @@ UserRoute.post(
           res.setHeader("auth-token", token);
 
           //End of response
-          res.setHeader("ref-token", refreshToken).json({ success: "yes" });
+          res.setHeader("ref-token", refreshToken).json({ user });
         });
     }
   }
@@ -227,47 +228,9 @@ UserRoute.get("/reAuth", authenticateToken, (req, res) => {
 });
 
 //Exchange expired auth-token with refreshToken
-UserRoute.post(
-  "/refresh",
-  async (req: express.Request, res: express.Response) => {
-    const refreshToken = req.body.refreshToken;
-    console.log("refresh");
-    jwt.verify(refreshToken, key, (err: any, id: any) => {
-      if (err) return res.sendStatus(403);
-      console.log("verified");
-      db.db
-        .collection("users")
-        .findOne({ username: id.username })
-        .then((user) => {
-          if (user != null) {
-            user.password = undefined;
-            const token = jwt.sign({ user }, key, {
-              expiresIn: "1d",
-            });
-            const renewedRefreshToken = jwt.sign(
-              { username: user.username },
-              key,
-              {
-                expiresIn: "7d",
-              }
-            );
-            res
-              .cookie("auth-token", token)
-              .cookie("refreshToken", renewedRefreshToken)
-              .status(200)
-              .send({
-                refreshed: "refreshed",
-              });
-          } else {
-            return res.status(400).send("not found");
-          }
-        })
-        .catch((err) => {
-          console.error(err);
-        });
-    });
-  }
-);
+UserRoute.post("/refresh", (req, res) => {
+  RefreshFunction(req, res);
+});
 
 //Mail verification
 UserRoute.get(
@@ -332,17 +295,63 @@ export function authenticateToken(
 ): express.Response<any, Record<string, any>> | undefined {
   const authsetHeader = req.headers["authorization"];
   const token = authsetHeader && authsetHeader.split(" ")[1];
-  if (token == null) return res.sendStatus(401);
+  if (token == null) return res.json("ERR_NO_TOKEN");
 
-  jwt.verify(token, key, (err: any, user: any) => {
+  jwt.verify(token, key, (err, user) => {
     /*   console.log(err);/*  */
     req.body.user = user;
-    if (err) return res.json({ err: "EXPIRED_TOKEN" }).status(403);
+    if (err) {
+      if (err instanceof jwt.TokenExpiredError) {
+        return res.status(403).json({ error: err });
+      } else if (err instanceof jwt.JsonWebTokenError) {
+        console.log(err);
+        return res.sendStatus(403);
+      }
+    }
 
     next();
   });
 }
 function createVerification(token: string) {
   return `${domain}/user/verifyViaEmail?token=${token}`;
+}
+
+async function RefreshFunction(req: express.Request, res: express.Response) {
+  const refreshToken = req.body.refreshToken;
+  console.log(refreshToken);
+  jwt.verify(refreshToken, key, (err: any, id: any) => {
+    if (err) return console.log(err);
+    console.log("verified");
+    db.db
+      .collection("users")
+      .findOne({ username: id.username })
+      .then((user) => {
+        if (user != null) {
+          user.password = undefined;
+          const token = jwt.sign({ user }, key, {
+            expiresIn: "1d",
+          });
+          const renewedRefreshToken = jwt.sign(
+            { username: user.username },
+            key,
+            {
+              expiresIn: "7d",
+            }
+          );
+          return res
+            .header("auth-token", token)
+            .header("ref-token", renewedRefreshToken)
+            .status(200)
+            .send({
+              refreshed: "refreshed",
+            });
+        } else {
+          return res.status(400).send("not found");
+        }
+      })
+      .catch((err) => {
+        console.error(err);
+      });
+  });
 }
 export default UserRoute;
