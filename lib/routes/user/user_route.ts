@@ -122,7 +122,16 @@ UserRoute.post(
           maxAge: 1000 * 60 * 60 * 7,
         });
         //Send token to setHeader
-        res.setHeader("auth-token", token).sendStatus(200);
+        res
+          .header("auth-token", token)
+          .header("ref-token", refreshToken)
+          .status(201)
+          .json({
+            email,
+            username: username.toLowerCase().trim(),
+            name,
+            surname,
+          });
       });
   }
 );
