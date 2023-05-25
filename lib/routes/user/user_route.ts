@@ -121,6 +121,21 @@ UserRoute.post(
           httpOnly: true,
           maxAge: 1000 * 60 * 60 * 7,
         });
+        //send verification mail
+        jwt.verify(token, key, (err: any, user: any) => {
+          const verificationKey = jwt.sign(
+            { userID: user._id, username: user.username },
+            key
+          );
+          mailer(
+            user.username,
+            createVerification(verificationKey),
+            user.email,
+            "Hatırlatsana'ya Hoşgeldin"
+          );
+          res.status(200).send("SENT");
+        });
+
         //Send token to setHeader
         res
           .header("auth-token", token)
